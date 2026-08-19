@@ -57,7 +57,7 @@ type App struct {
 
 func NewApp() *App {
 	return &App{
-		dbPath: "outaspace.db",
+		dbPath: filepath.Join(os.TempDir(), "outaspace.db"),
 	}
 }
 
