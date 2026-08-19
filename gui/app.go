@@ -53,7 +53,7 @@ type App struct {
 
 func NewApp() *App {
 	return &App{
-		dbPath: "spacedout.db",
+		dbPath: "outaspace.db",
 	}
 }
 
