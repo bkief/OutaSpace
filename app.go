@@ -203,16 +203,16 @@ func (a *App) scanDirectory(root string, speed string) {
 	var maxWorkers int
 	switch speed {
 	case "slow":
-		maxWorkers = 1
+		fallthrough
+	case "fast":
+		maxWorkers = numCPU
 	case "medium":
 		maxWorkers = numCPU / 2
 		if maxWorkers < 1 {
 			maxWorkers = 1
 		}
-	case "fast":
-		fallthrough
 	default:
-		maxWorkers = numCPU
+		maxWorkers = 1
 	}
 
 	sem := semaphore.NewWeighted(int64(maxWorkers))
