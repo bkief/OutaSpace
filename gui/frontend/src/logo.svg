@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2a2e45" />
+      <stop offset="40%" stop-color="#21253b" />
+      <stop offset="100%" stop-color="#141624" />
+    </linearGradient>
+    <linearGradient id="streamGrad1" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1d549f" />
+      <stop offset="35%" stop-color="#277dd6" />
+      <stop offset="70%" stop-color="#389fed" />
+      <stop offset="100%" stop-color="#4bb3f7" />
+    </linearGradient>
+    <linearGradient id="streamGrad2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#183f80" />
+      <stop offset="50%" stop-color="#2572c2" />
+      <stop offset="100%" stop-color="#388ee0" />
+    </linearGradient>
+  </defs>
+
+  <!-- Squircle Rounded Base -->
+  <rect x="3" y="3" width="122" height="122" rx="28" ry="28" fill="url(#bgGrad)" stroke="#3b4463" stroke-width="2.5" />
+
+  <!-- Main Diagonal Cosmic Band -->
+  <path d="M -4 76 C 24 50 52 24 82 0 L 102 0 C 76 28 42 62 18 106 C 8 120 -4 130 -4 130 Z" fill="url(#streamGrad1)" />
+
+  <!-- Secondary Ribbon on Right -->
+  <path d="M 60 130 C 74 98 94 56 128 20 L 128 42 C 104 72 84 108 74 130 Z" fill="url(#streamGrad2)" />
+
+  <!-- Yellow 4-point Sparkle Stars -->
+  <!-- Top Center Yellow Star -->
+  <path d="M 61 42 C 61 37 64 34 69 34 C 64 34 61 31 61 26 C 61 31 58 34 53 34 C 58 34 61 37 61 42 Z" fill="#facc15" />
+  <!-- Bottom Left Yellow Star -->
+  <path d="M 35 80 C 35 73 39 69 46 69 C 39 69 35 65 35 58 C 35 65 31 69 24 69 C 31 69 35 73 35 80 Z" fill="#facc15" />
+  <!-- Right Yellow Star -->
+  <path d="M 89 77 C 89 72 92 69 97 69 C 92 69 89 66 89 61 C 89 66 86 69 81 69 C 86 69 89 72 89 77 Z" fill="#facc15" />
+
+  <!-- Cyan Sparkle Stars -->
+  <!-- Top Right Cyan Star -->
+  <path d="M 94 27 C 94 22 96 20 101 20 C 96 20 94 18 94 13 C 94 18 92 20 87 20 C 92 20 94 22 94 27 Z" fill="#67e8f9" />
+  <!-- Center Left Cyan Star -->
+  <path d="M 56 69 C 56 65 58 63 62 63 C 58 63 56 61 56 57 C 56 61 54 63 50 63 C 54 63 56 65 56 69 Z" fill="#67e8f9" />
+
+  <!-- Glistening Star Dots -->
+  <circle cx="25" cy="23" r="2.2" fill="#38bdf8" />
+  <circle cx="12" cy="45" r="2.5" fill="#60a5fa" />
+  <circle cx="16" cy="98" r="2.2" fill="#f1f5f9" />
+  <circle cx="39" cy="55" r="2.2" fill="#38bdf8" />
+  <circle cx="77" cy="46" r="2" fill="#38bdf8" />
+  <circle cx="77" cy="98" r="2.2" fill="#60a5fa" />
+  <circle cx="95" cy="106" r="2.4" fill="#3b82f6" />
+  <circle cx="111" cy="80" r="2.2" fill="#60a5fa" />
+  <circle cx="115" cy="47" r="2.2" fill="#f472b6" />
+  <circle cx="91" cy="14" r="2.2" fill="#f1f5f9" />
+</svg>

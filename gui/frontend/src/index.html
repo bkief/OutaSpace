@@ -9,22 +9,23 @@
 <body class="dark-theme">
     <!-- Floating Start / Splash UI -->
     <div id="ui-layer">
-        <div class="splash-logo">🌌</div>
+        <img src="./logo.svg" class="splash-logo" alt="SpacedOut Milky Way Logo"/>
         <h1>SpacedOut</h1>
-        <p class="subtitle">Real-time disk space rain & interactive WinDirStat visualizer</p>
+        <p class="subtitle">Real-time disk space rain & interactive treemap visualizer</p>
         
         <div class="control-row">
-            <label for="speed-select">Concurrency:</label>
-            <select id="speed-select" class="styled-select">
-                <option value="slow">Slow</option>
-                <option value="medium">Medium</option>
-                <option value="fast" selected>Fast</option>
-            </select>
+            <span class="control-label">Scan Speed</span>
+            <div class="segmented-control" id="speed-segmented">
+                <button type="button" class="seg-btn" data-value="slow">Slow</button>
+                <button type="button" class="seg-btn" data-value="medium">Medium</button>
+                <button type="button" class="seg-btn active" data-value="fast">Fast</button>
+            </div>
+            <input type="hidden" id="speed-select" value="fast"/>
         </div>
 
         <div class="action-buttons">
             <button id="scan-btn" class="btn btn-primary">Select Directory to Scan</button>
-            <button id="results-btn" class="btn btn-accent" style="display: none;">📊 View WinDirStat Results</button>
+            <button id="results-btn" class="btn btn-accent" style="display: none;">📊 View Results</button>
         </div>
         <p id="status-text"></p>
     </div>
@@ -32,11 +33,15 @@
     <!-- Fullscreen Rain Canvas Background -->
     <canvas id="canvas"></canvas>
 
-    <!-- Modern WinDirStat Inspired Results Overlay -->
+    <!-- Results Dashboard Overlay -->
     <div id="treemap-container">
         <!-- Top Toolbar & Breadcrumb -->
         <header class="wds-header">
             <div class="wds-nav">
+                <div class="wds-brand">
+                    <img src="./logo.svg" class="wds-logo" alt="SpacedOut Logo"/>
+                    <span class="wds-brand-title">SpacedOut</span>
+                </div>
                 <button id="wds-up-btn" class="wds-btn" title="Go up one directory">⬆ Up</button>
                 <div id="wds-breadcrumbs" class="wds-breadcrumbs"></div>
             </div>

@@ -9,7 +9,7 @@ const rainColors = [
     '#66fcf1', '#45a29e', '#f43f5e', '#10b981', '#f59e0b', '#a855f7', '#38bdf8'
 ];
 
-// Color mapping for file extensions (WinDirStat inspired)
+// Color mapping for file extensions
 const extColorPalette = {
     // Media & Video
     mp4: '#38bdf8', mkv: '#0284c7', avi: '#0369a1', mov: '#0ea5e9', webm: '#38bdf8',
@@ -103,28 +103,29 @@ class Circle {
     draw(ctx) {
         if (this.alpha <= 0) return;
         
+        const drawX = Math.round(this.x);
+        const drawY = Math.round(this.y);
+
         ctx.globalAlpha = this.alpha;
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        
-        ctx.shadowBlur = 4;
-        ctx.shadowColor = this.color;
+        ctx.arc(drawX, drawY, this.radius, 0, Math.PI * 2);
         ctx.fillStyle = this.color;
         ctx.fill();
-        ctx.shadowBlur = 0;
         
         if (this.showText && this.radius > 4) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-            ctx.font = '10px "Segoe UI", sans-serif';
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '600 10px "Segoe UI", -apple-system, sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(this.name, this.x, this.y - this.radius - 4);
+            ctx.fillText(this.name, drawX, Math.round(drawY - this.radius - 4));
         }
         ctx.globalAlpha = 1;
     }
 }
 
 function animate() {
-    ctx.fillStyle = 'rgba(11, 12, 16, 0.35)';
+    // Clear canvas completely each frame to eliminate all motion blur and ghost trails
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = '#0b0c10';
     ctx.fillRect(0, 0, width, height);
     
     for (let i = circles.length - 1; i >= 0; i--) {
@@ -139,10 +140,10 @@ function animate() {
 }
 
 // -------------------------------------------------------------
-// WinDirStat Dashboard Rendering
+// Results Dashboard Rendering
 // -------------------------------------------------------------
 
-async function renderWinDirStatView(view) {
+async function renderResultsView(view) {
     if (!view) return;
     currentFolderView = view;
 
@@ -161,7 +162,7 @@ async function renderWinDirStatView(view) {
         upBtn.disabled = false;
         upBtn.onclick = async () => {
             const pView = await window.go.main.App.GetFolderView(view.parent);
-            if (pView) renderWinDirStatView(pView);
+            if (pView) renderResultsView(pView);
         };
     } else {
         upBtn.disabled = true;
@@ -206,7 +207,7 @@ function renderBreadcrumbs(pathStr) {
         crumb.onclick = async () => {
             if (idx !== segments.length - 1) {
                 const targetView = await window.go.main.App.GetFolderView(targetPath);
-                if (targetView) renderWinDirStatView(targetView);
+                if (targetView) renderResultsView(targetView);
             }
         };
 
@@ -234,7 +235,7 @@ function renderTable(items, totalFolderSize) {
             tr.className = 'is-dir';
             tr.onclick = async () => {
                 const childView = await window.go.main.App.GetFolderView(item.path);
-                if (childView) renderWinDirStatView(childView);
+                if (childView) renderResultsView(childView);
             };
         }
 
@@ -361,7 +362,7 @@ function renderTreemap(items, totalSize) {
             echartsInstance.on('click', async (params) => {
                 if (params.data && params.data.isDir && params.data.path) {
                     const childView = await window.go.main.App.GetFolderView(params.data.path);
-                    if (childView) renderWinDirStatView(childView);
+                    if (childView) renderResultsView(childView);
                 }
             });
         }
@@ -478,6 +479,19 @@ window.onload = function() {
     const statusText = document.getElementById('status-text');
     const closeBtn = document.getElementById('wds-close-btn');
     const tmContainer = document.getElementById('treemap-container');
+    const speedInput = document.getElementById('speed-select');
+
+    // Segmented Speed Control
+    const segButtons = document.querySelectorAll('.seg-btn');
+    segButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            segButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            if (speedInput) {
+                speedInput.value = btn.getAttribute('data-value');
+            }
+        });
+    });
 
     scanBtn.addEventListener('click', async () => {
         statusText.innerText = "Selecting directory...";
@@ -499,12 +513,12 @@ window.onload = function() {
     });
 
     resultsBtn.addEventListener('click', async () => {
-        statusText.innerText = "Loading WinDirStat view...";
+        statusText.innerText = "Loading results...";
         try {
             const rootData = await window.go.main.App.GetRootFolderView();
             if (rootData) {
                 uiLayer.style.display = 'none';
-                renderWinDirStatView(rootData);
+                renderResultsView(rootData);
             } else {
                 statusText.innerText = "No tree data available.";
             }
