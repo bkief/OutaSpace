@@ -3,24 +3,103 @@
 <head>
     <meta charset="UTF-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>SpacedOut</title>
+    <title>SpacedOut - Visual Disk Space Analyzer</title>
     <link rel="stylesheet" href="./main.css"/>
 </head>
 <body class="dark-theme">
+    <!-- Floating Start / Splash UI -->
     <div id="ui-layer">
-        <h1>SpacedOut Visualizer</h1>
-        <div style="margin-bottom: 20px;">
-            <select id="speed-select" class="btn" style="background: rgba(11, 12, 16, 0.7);">
+        <div class="splash-logo">🌌</div>
+        <h1>SpacedOut</h1>
+        <p class="subtitle">Real-time disk space rain & interactive WinDirStat visualizer</p>
+        
+        <div class="control-row">
+            <label for="speed-select">Concurrency:</label>
+            <select id="speed-select" class="styled-select">
                 <option value="slow">Slow</option>
                 <option value="medium">Medium</option>
                 <option value="fast" selected>Fast</option>
             </select>
         </div>
-        <button id="scan-btn" class="btn">Select Directory to Scan</button>
+
+        <div class="action-buttons">
+            <button id="scan-btn" class="btn btn-primary">Select Directory to Scan</button>
+            <button id="results-btn" class="btn btn-accent" style="display: none;">📊 View WinDirStat Results</button>
+        </div>
         <p id="status-text"></p>
     </div>
+
+    <!-- Fullscreen Rain Canvas Background -->
     <canvas id="canvas"></canvas>
 
+    <!-- Modern WinDirStat Inspired Results Overlay -->
+    <div id="treemap-container">
+        <!-- Top Toolbar & Breadcrumb -->
+        <header class="wds-header">
+            <div class="wds-nav">
+                <button id="wds-up-btn" class="wds-btn" title="Go up one directory">⬆ Up</button>
+                <div id="wds-breadcrumbs" class="wds-breadcrumbs"></div>
+            </div>
+            <div class="wds-stats">
+                <span id="wds-total-size" class="wds-badge">Total: 0 B</span>
+                <span id="wds-item-count" class="wds-badge">0 items</span>
+                <button id="wds-close-btn" class="wds-btn wds-btn-close" title="Return to live rain view">✖ Rain View</button>
+            </div>
+        </header>
+
+        <!-- Main Split Workspace -->
+        <div class="wds-workspace">
+            <!-- Top Section: Table List & Extension Legend -->
+            <div class="wds-top-section">
+                <!-- Directory / File Table -->
+                <div class="wds-table-pane">
+                    <div class="pane-header">
+                        <span>Directory Contents</span>
+                        <span id="wds-dir-count" class="subtle-count"></span>
+                    </div>
+                    <div class="table-scroll-wrapper">
+                        <table class="wds-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 42%;">Name</th>
+                                    <th style="width: 28%;">Proportion</th>
+                                    <th style="width: 18%;">Size</th>
+                                    <th style="width: 12%;">Type</th>
+                                </tr>
+                            </thead>
+                            <tbody id="wds-table-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Extension Breakdown Legend -->
+                <div class="wds-ext-pane">
+                    <div class="pane-header">
+                        <span>Extension Legend</span>
+                        <span class="subtle-count">Color Coded</span>
+                    </div>
+                    <div id="wds-ext-list" class="ext-scroll-wrapper">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Section: ECharts Treemap Cushion -->
+            <div class="wds-bottom-section">
+                <div class="pane-header treemap-header">
+                    <span>Interactive Cushion Treemap</span>
+                    <span class="subtle-count">Click folder to drill down</span>
+                </div>
+                <div id="wds-chart-wrapper" class="wds-chart-wrapper">
+                    <div id="wds-chart" style="width: 100%; height: 100%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./echarts.min.js"></script>
     <script src="./main.js"></script>
 </body>
 </html>
