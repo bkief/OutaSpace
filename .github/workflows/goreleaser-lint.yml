@@ -1,0 +1,23 @@
+name: GoReleaser Lint
+
+on:
+  pull_request:
+    paths:
+      - '.goreleaser.yaml'
+
+jobs:
+  goreleaser-check:
+    name: goreleaser check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run GoReleaser check
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check --config .goreleaser.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
