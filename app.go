@@ -224,7 +224,7 @@ func (a *App) scanDirectory(root string, speed string) {
 	a.rootPath = root
 	a.dbMutex.Unlock()
 
-	fileChan := make(chan FileStat, 5000)
+	fileChan := make(chan FileStat, 300)
 	dbChan := make(chan DBEntry, 10000)
 	var wg sync.WaitGroup
 
@@ -244,7 +244,7 @@ func (a *App) scanDirectory(root string, speed string) {
 					return
 				}
 				batch = append(batch, f)
-				if len(batch) >= 100 {
+				if len(batch) >= 20 {
 					runtime.EventsEmit(a.ctx, "files-scanned", batch)
 					batch = batch[:0]
 				}
@@ -358,9 +358,11 @@ func (a *App) scanDirectory(root string, speed string) {
 						IsDir:      false,
 					}
 
-					// Sample ~0.5% of files for rain animation
-					if rand.Float32() < 0.005 {
-						fileChan <- FileStat{Name: entry.Name(), Size: size}
+					// Non-blocking send to fileChan (poor man's backpressure rate-limiter)
+					select {
+					case fileChan <- FileStat{Name: entry.Name(), Size: size}:
+					default:
+						// Buffer full: drop sample naturally when scanning at high speeds
 					}
 				}
 			}

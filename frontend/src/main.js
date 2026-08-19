@@ -534,11 +534,33 @@ window.onload = function() {
         resizeCanvas();
     });
 
-    // Listen to Wails events from Go backend
+    // Dynamic Saturation & Adaptive Rate Limiter for Rain
+    const TARGET_SATURATION = 100;
+    const HARD_CAP = 250;
+
     window.runtime.EventsOn("files-scanned", (files) => {
-        files.forEach(f => {
-            circles.push(new Circle(f));
-        });
+        if (!files || !files.length) return;
+
+        for (let i = 0; i < files.length; i++) {
+            const activeCount = circles.length;
+
+            if (activeCount >= HARD_CAP) {
+                break;
+            }
+
+            if (activeCount < TARGET_SATURATION) {
+                // Under saturation: 100% admission for instantaneous feedback on start or small scans
+                circles.push(new Circle(files[i]));
+            } else {
+                // Saturated: dynamically scale down admission rate to maintain comfortable density
+                const saturationRatio = activeCount / TARGET_SATURATION;
+                const admissionProbability = Math.max(0.04, 0.4 / (saturationRatio * saturationRatio));
+
+                if (Math.random() < admissionProbability) {
+                    circles.push(new Circle(files[i]));
+                }
+            }
+        }
     });
 
     window.runtime.EventsOn("scan-complete", () => {
