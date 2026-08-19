@@ -132,8 +132,9 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
           NEEDRESTART_MODE: a
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends \
+          sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+          sudo apt-get -o Acquire::http::Timeout=10 -o Acquire::Retries=2 update -y
+          sudo apt-get -o Acquire::http::Timeout=10 -o Acquire::Retries=2 install -y --no-install-recommends \
             -o Dpkg::Options::="--force-confdef" \
             -o Dpkg::Options::="--force-confold" \
             libgtk-3-dev libwebkit2gtk-4.0-dev file
