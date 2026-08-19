@@ -6,13 +6,13 @@ project_name: outaspace
 builds:
   - id: outaspace-linux
     binary: OutaSpace
-    builder: prebuilt
+    builder: custom
+    commands:
+      - cp build/bin/OutaSpace {{ .Path }}
     goos:
       - linux
     goarch:
       - amd64
-    prebuilt:
-      path: build/bin/OutaSpace
 
 nfpms:
   - id: outaspace-pkgs
