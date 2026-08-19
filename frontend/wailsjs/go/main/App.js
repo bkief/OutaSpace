@@ -26,6 +26,10 @@ export function GetRootFolderView() {
   return window['go']['main']['App']['GetRootFolderView']();
 }
 
+export function OpenFile(arg1) {
+  return window['go']['main']['App']['OpenFile'](arg1);
+}
+
 export function SelectDirectory(arg1) {
   return window['go']['main']['App']['SelectDirectory'](arg1);
 }

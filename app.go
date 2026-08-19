@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
 	"sync"
@@ -140,6 +142,25 @@ func (a *App) SelectDirectory(speed string) string {
 
 	go a.scanDirectory(dir, speed)
 	return dir
+}
+
+// OpenFile opens a file or directory using the host operating system's default viewer/application
+func (a *App) OpenFile(path string) error {
+	if path == "" {
+		return fmt.Errorf("empty path")
+	}
+
+	var cmd *exec.Cmd
+	switch goruntime.GOOS {
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", path)
+	case "darwin":
+		cmd = exec.Command("open", path)
+	default:
+		cmd = exec.Command("xdg-open", path)
+	}
+
+	return cmd.Start()
 }
 
 // GetRootFolderView queries SQLite for the root directory view

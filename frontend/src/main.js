@@ -562,11 +562,11 @@ window.onload = function() {
             try {
                 const savedPath = await window.go.main.App.ExportHTMLReport();
                 if (savedPath) {
-                    showToast(`📄 Report saved to: ${savedPath}`);
+                    showToast("📄 HTML Summary Exported", savedPath);
                 }
             } catch (err) {
                 console.error("Export error:", err);
-                showToast(`❌ Export failed: ${err}`, true);
+                showToast(`❌ Export failed: ${err}`, null, true);
             }
         });
     }
@@ -577,11 +577,11 @@ window.onload = function() {
             try {
                 const savedPath = await window.go.main.App.ExportHTMLTreeReport();
                 if (savedPath) {
-                    showToast(`🌳 Tree report saved to: ${savedPath}`);
+                    showToast("🌳 HTML Tree Report Exported", savedPath);
                 }
             } catch (err) {
                 console.error("Tree export error:", err);
-                showToast(`❌ Tree export failed: ${err}`, true);
+                showToast(`❌ Tree export failed: ${err}`, null, true);
             }
         });
     }
@@ -592,11 +592,11 @@ window.onload = function() {
             try {
                 const savedPath = await window.go.main.App.ExportTextTreeReport();
                 if (savedPath) {
-                    showToast(`📝 Text tree saved to: ${savedPath}`);
+                    showToast("📝 Plain Text Tree Exported", savedPath);
                 }
             } catch (err) {
                 console.error("Text export error:", err);
-                showToast(`❌ Text export failed: ${err}`, true);
+                showToast(`❌ Text export failed: ${err}`, null, true);
             }
         });
     }
@@ -607,16 +607,16 @@ window.onload = function() {
             try {
                 const savedPath = await window.go.main.App.ExportRawDataCSV();
                 if (savedPath) {
-                    showToast(`📊 CSV data saved to: ${savedPath}`);
+                    showToast("📊 Raw Data CSV Exported", savedPath);
                 }
             } catch (err) {
                 console.error("CSV export error:", err);
-                showToast(`❌ CSV export failed: ${err}`, true);
+                showToast(`❌ CSV export failed: ${err}`, null, true);
             }
         });
     }
 
-    function showToast(message, isError = false) {
+    function showToast(title, filePath = null, isError = false) {
         const existing = document.querySelector('.toast-notification');
         if (existing) existing.remove();
 
@@ -626,7 +626,44 @@ window.onload = function() {
             toast.style.borderColor = 'var(--accent-pink)';
             toast.style.boxShadow = '0 8px 30px rgba(0,0,0,0.6), 0 0 20px rgba(244, 63, 94, 0.3)';
         }
-        toast.innerText = message;
+
+        const content = document.createElement('div');
+        content.className = 'toast-content';
+
+        const titleEl = document.createElement('div');
+        titleEl.className = 'toast-title';
+        titleEl.innerText = title;
+        content.appendChild(titleEl);
+
+        if (filePath) {
+            const linkEl = document.createElement('span');
+            linkEl.className = 'toast-link';
+            linkEl.innerText = filePath;
+            linkEl.title = `Click to open: ${filePath}`;
+            linkEl.addEventListener('click', () => {
+                if (window.go && window.go.main && window.go.main.App.OpenFile) {
+                    window.go.main.App.OpenFile(filePath);
+                }
+            });
+            content.appendChild(linkEl);
+        }
+
+        toast.appendChild(content);
+
+        if (filePath) {
+            const openBtn = document.createElement('button');
+            openBtn.className = 'toast-open-btn';
+            openBtn.type = 'button';
+            openBtn.innerText = '📂 Open';
+            openBtn.title = 'Open exported file in default application';
+            openBtn.addEventListener('click', () => {
+                if (window.go && window.go.main && window.go.main.App.OpenFile) {
+                    window.go.main.App.OpenFile(filePath);
+                }
+            });
+            toast.appendChild(openBtn);
+        }
+
         document.body.appendChild(toast);
 
         setTimeout(() => {
@@ -634,7 +671,7 @@ window.onload = function() {
             toast.style.transform = 'translateY(10px)';
             toast.style.transition = 'all 0.3s ease';
             setTimeout(() => toast.remove(), 300);
-        }, 4500);
+        }, 7000);
     }
 
     // Dynamic Saturation & Adaptive Rate Limiter for Rain

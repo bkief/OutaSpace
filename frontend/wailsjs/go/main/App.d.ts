@@ -14,4 +14,6 @@ export function GetFolderView(arg1:string):Promise<main.FolderView>;
 
 export function GetRootFolderView():Promise<main.FolderView>;
 
+export function OpenFile(arg1:string):Promise<void>;
+
 export function SelectDirectory(arg1:string):Promise<string>;
