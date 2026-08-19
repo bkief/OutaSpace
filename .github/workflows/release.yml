@@ -1,0 +1,242 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release Tag Name (e.g. v1.0.0)"
+        required: true
+        type: string
+      release_name:
+        description: "Release Title (optional, defaults to tag name)"
+        required: false
+        type: string
+        default: ""
+      release_notes:
+        description: "Release Notes / Description (optional)"
+        required: false
+        type: string
+        default: ""
+      draft:
+        description: "Create as draft"
+        required: false
+        type: boolean
+        default: false
+      prerelease:
+        description: "Create as prerelease"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows Artifacts
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          check-latest: true
+
+      - name: Install Wails CLI
+        shell: pwsh
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build Windows Executable
+        shell: pwsh
+        run: |
+          wails build -platform windows/amd64
+
+      - name: Build Windows Per-User MSI
+        shell: pwsh
+        run: |
+          # Locate WiX Toolset v3 on runner
+          $wixDir = Get-ChildItem -Path "C:\Program Files (x86)\WiX Toolset*" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -First 1
+          if ($wixDir -and (Test-Path "$wixDir\bin")) {
+            $env:PATH = "$wixDir\bin;" + $env:PATH
+          }
+
+          # Parse product version from tag name (strip leading 'v')
+          $rawTag = "${{ inputs.tag_name }}"
+          $cleanVersion = ($rawTag -replace '^v','').Trim()
+          $parts = $cleanVersion.Split('.')
+          while ($parts.Count -lt 3) { $parts += "0" }
+          $wixVersion = ($parts[0..2] -join '.')
+          if ($parts.Count -ge 4) {
+            $wixVersion = ($parts[0..3] -join '.')
+          }
+          Write-Host "Using WiX Product Version: $wixVersion"
+
+          candle.exe -arch x64 "-dProductVersion=$wixVersion" build/windows/installer/outaspace-user.wxs -out build/bin/outaspace.wixobj
+          light.exe -sval build/bin/outaspace.wixobj -out build/bin/OutaSpace-windows-amd64.msi
+
+      - name: Prepare Windows Release Artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item "build\bin\OutaSpace.exe" -Destination "dist\OutaSpace-windows-amd64.exe"
+          Copy-Item "build\bin\OutaSpace-windows-amd64.msi" -Destination "dist\OutaSpace-windows-amd64.msi"
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: dist/*
+          if-no-files-found: error
+
+  build-linux:
+    name: Build Linux AppImage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev file
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          check-latest: true
+
+      - name: Install Wails CLI
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build Linux Binary
+        run: |
+          wails build -platform linux/amd64
+
+      - name: Package AppImage
+        run: |
+          mkdir -p dist
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+
+          cp build/bin/OutaSpace AppDir/usr/bin/OutaSpace
+          chmod +x AppDir/usr/bin/OutaSpace
+          cp build/appicon.png AppDir/usr/share/icons/hicolor/256x256/apps/outaspace.png
+          cp build/appicon.png AppDir/outaspace.png
+
+          cat << 'EOF' > AppDir/OutaSpace.desktop
+          [Desktop Entry]
+          Name=OutaSpace
+          Comment=Visual Disk Space Analyzer
+          Exec=OutaSpace
+          Icon=outaspace
+          Type=Application
+          Categories=Utility;System;
+          Terminal=false
+          EOF
+
+          cat << 'EOF' > AppDir/AppRun
+          #!/bin/sh
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          export PATH="${HERE}/usr/bin:${PATH}"
+          exec "${HERE}/usr/bin/OutaSpace" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+
+          curl -sLO https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          ARCH=x86_64 ./appimagetool-x86_64.AppImage --appimage-extract-and-run AppDir dist/OutaSpace-linux-amd64.AppImage
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts
+          path: dist/*
+          if-no-files-found: error
+
+  build-macos:
+    name: Build macOS DMG
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          check-latest: true
+
+      - name: Install Wails CLI
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build macOS Universal App
+        run: |
+          wails build -platform darwin/universal
+
+      - name: Package DMG
+        run: |
+          brew install create-dmg || true
+          mkdir -p dist
+
+          if command -v create-dmg > /dev/null; then
+            create-dmg \
+              --volname "OutaSpace" \
+              --window-pos 200 120 \
+              --window-size 600 400 \
+              --icon-size 100 \
+              --icon "OutaSpace.app" 175 190 \
+              --hide-extension "OutaSpace.app" \
+              --app-drop-link 425 190 \
+              "dist/OutaSpace-darwin-universal.dmg" \
+              "build/bin/OutaSpace.app" || hdiutil create -volname "OutaSpace" -srcfolder "build/bin/OutaSpace.app" -ov -format UDZO "dist/OutaSpace-darwin-universal.dmg"
+          else
+            hdiutil create -volname "OutaSpace" -srcfolder "build/bin/OutaSpace.app" -ov -format UDZO "dist/OutaSpace-darwin-universal.dmg"
+          fi
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifacts
+          path: dist/*
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-linux, build-macos]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten and Checksum Artifacts
+        run: |
+          mkdir -p release-files
+          find artifacts -type f -exec cp {} release-files/ \;
+          cd release-files
+          sha256sum * > SHA256SUMS.txt
+          ls -la
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag_name }}
+          name: ${{ inputs.release_name != '' && inputs.release_name || inputs.tag_name }}
+          body: ${{ inputs.release_notes }}
+          draft: ${{ inputs.draft }}
+          prerelease: ${{ inputs.prerelease }}
+          files: release-files/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
