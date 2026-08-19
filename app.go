@@ -43,11 +43,13 @@ type FileStat struct {
 }
 
 type App struct {
-	ctx      context.Context
-	db       *sql.DB
-	dbPath   string
-	rootPath string
-	dbMutex  sync.RWMutex
+	ctx           context.Context
+	db            *sql.DB
+	dbPath        string
+	rootPath      string
+	scanStartTime time.Time
+	scanDuration  time.Duration
+	dbMutex       sync.RWMutex
 }
 
 func NewApp() *App {
@@ -387,6 +389,7 @@ func (a *App) scanDirectory(root string, speed string) {
 		return totalDirSize
 	}
 
+	startTime := time.Now()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -397,6 +400,11 @@ func (a *App) scanDirectory(root string, speed string) {
 	close(fileChan)
 	close(dbChan)
 	dbWg.Wait()
+
+	a.dbMutex.Lock()
+	a.scanStartTime = startTime
+	a.scanDuration = time.Since(startTime)
+	a.dbMutex.Unlock()
 
 	runtime.EventsEmit(a.ctx, "scan-complete")
 }

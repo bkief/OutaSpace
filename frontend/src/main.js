@@ -534,6 +534,60 @@ window.onload = function() {
         resizeCanvas();
     });
 
+    // Export Dropdown & Report Handlers
+    const exportDropdown = document.getElementById('wds-export-dropdown');
+    const exportBtn = document.getElementById('wds-export-btn');
+    const exportHtmlBtn = document.getElementById('export-html-btn');
+
+    if (exportBtn && exportDropdown) {
+        exportBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            exportDropdown.classList.toggle('open');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!exportDropdown.contains(e.target)) {
+                exportDropdown.classList.remove('open');
+            }
+        });
+    }
+
+    if (exportHtmlBtn) {
+        exportHtmlBtn.addEventListener('click', async () => {
+            exportDropdown.classList.remove('open');
+            try {
+                const savedPath = await window.go.main.App.ExportHTMLReport();
+                if (savedPath) {
+                    showToast(`📄 Report saved to: ${savedPath}`);
+                }
+            } catch (err) {
+                console.error("Export error:", err);
+                showToast(`❌ Export failed: ${err}`, true);
+            }
+        });
+    }
+
+    function showToast(message, isError = false) {
+        const existing = document.querySelector('.toast-notification');
+        if (existing) existing.remove();
+
+        const toast = document.createElement('div');
+        toast.className = 'toast-notification';
+        if (isError) {
+            toast.style.borderColor = 'var(--accent-pink)';
+            toast.style.boxShadow = '0 8px 30px rgba(0,0,0,0.6), 0 0 20px rgba(244, 63, 94, 0.3)';
+        }
+        toast.innerText = message;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(10px)';
+            toast.style.transition = 'all 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, 4500);
+    }
+
     // Dynamic Saturation & Adaptive Rate Limiter for Rain
     const TARGET_SATURATION = 100;
     const HARD_CAP = 250;

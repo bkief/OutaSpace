@@ -48,6 +48,20 @@
             <div class="wds-stats">
                 <span id="wds-total-size" class="wds-badge">Total: 0 B</span>
                 <span id="wds-item-count" class="wds-badge">0 items</span>
+                <div class="dropdown" id="wds-export-dropdown">
+                    <button id="wds-export-btn" class="wds-btn wds-btn-export" title="Export scan report">
+                        <span>📥 Export</span> <span class="caret">▾</span>
+                    </button>
+                    <div class="dropdown-menu" id="wds-export-menu">
+                        <button type="button" class="dropdown-item" id="export-html-btn">
+                            <span class="item-icon">📄</span>
+                            <div class="item-text">
+                                <div class="item-title">HTML Summary</div>
+                                <div class="item-desc">Standalone audit report (.html)</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
                 <button id="wds-close-btn" class="wds-btn wds-btn-close" title="Return to live rain view">✖ Rain View</button>
             </div>
         </header>
