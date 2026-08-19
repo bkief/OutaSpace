@@ -128,9 +128,15 @@ jobs:
           fetch-depth: 0
 
       - name: Install Linux System Dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          NEEDRESTART_MODE: a
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.0-dev file || sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev file
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends \
+            -o Dpkg::Options::="--force-confdef" \
+            -o Dpkg::Options::="--force-confold" \
+            libgtk-3-dev libwebkit2gtk-4.0-dev file
 
       - name: Setup Go
         uses: actions/setup-go@v5
