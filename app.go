@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"math/rand"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
