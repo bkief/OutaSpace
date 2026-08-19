@@ -361,7 +361,7 @@ func generateReportHTML(
 			box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 		}
 		table {
-			width: 100%;
+			width: 100%%;
 			border-collapse: collapse;
 			text-align: left;
 			font-size: 13.5px;
@@ -402,7 +402,7 @@ func generateReportHTML(
 			overflow: hidden;
 		}
 		.progress-fill {
-			height: 100%;
+			height: 100%%;
 			background: linear-gradient(90deg, var(--primary), var(--accent-blue));
 			border-radius: 999px;
 		}
