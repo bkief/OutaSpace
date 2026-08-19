@@ -8,6 +8,7 @@ build/windows/installer/tmp/
 build/windows/msix/staging/
 dist/
 extra-files/
+*.syso
 
 # IDEs
 .idea
