@@ -7,8 +7,8 @@ builds:
   - id: outaspace-linux
     binary: OutaSpace
     builder: custom
-    commands:
-      - cp build/bin/OutaSpace {{ .Path }}
+    custom:
+      command: cp build/bin/OutaSpace {{ .Path }}
     goos:
       - linux
     goarch:
