@@ -3,13 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime"
-
-	//"sync"
 
 	"golang.org/x/sync/semaphore"
 )
@@ -33,31 +30,43 @@ var sem = semaphore.NewWeighted(int64(maxWorkers))
 var ctx = context.TODO()
 
 func main() {
+	// 1. Allow custom path via args
+	targetPath := "."
+	if len(os.Args) > 1 {
+		targetPath = os.Args[1]
+	}
 
-	root, _ := filepath.Abs(".")
+	root, err := filepath.Abs(targetPath)
+	if err != nil {
+		log.Fatalf("Invalid path: %v", err)
+	}
 
 	result := make(chan DirTree, 1)
 	if _, err := os.Stat(root); err == nil {
 		go osReadDir(root, result)
 	} else {
-		log.Fatal("Path does not exist!")
+		log.Fatalf("Path does not exist: %s", root)
 	}
 
 	finalTree := <-result
-	treeJson, _ := json.MarshalIndent(finalTree, "", "    ")
+
 	f, err := os.Create("space_report.json")
 	if err != nil {
-		log.Fatal("Err opening file")
+		log.Fatalf("Error creating file: %v", err)
 	}
 	defer f.Close()
 
-	f.Write(treeJson)
-	f.Sync()
+	// 2. Stream JSON directly to file to save memory
+	encoder := json.NewEncoder(f)
+	encoder.SetIndent("", "    ")
+	if err := encoder.Encode(finalTree); err != nil {
+		log.Fatalf("Error encoding JSON: %v", err)
+	}
 }
 
 func osReadDir(root string, dirStructure chan<- DirTree) {
 	defer close(dirStructure)
-	tree := DirTree{filepath.Base(root), root, 0, nil, nil}
+	tree := DirTree{Name: filepath.Base(root), Path: root}
 
 	err := sem.Acquire(ctx, 1)
 	if err != nil {
@@ -65,47 +74,42 @@ func osReadDir(root string, dirStructure chan<- DirTree) {
 		return
 	}
 
-	f, err := os.Open(root)
-	if err != nil {
-		return
-	}
-	dirInfo, err := f.Readdir(-1)
-	f.Close()
-	if err != nil {
-		return
-	}
+	// 3. Use modern os.ReadDir
+	dirInfo, err := os.ReadDir(root)
+	
+	// 4. FIX BUG: Immediately release semaphore after IO, regardless of success/fail
+	sem.Release(1) 
 
-	i := 0
+	if err != nil {
+		log.Printf("Skipping unreadable dir %s: %v", root, err)
+		return
+	}
 
 	subDirChannels := make([]<-chan DirTree, 0)
-	for _, fi := range dirInfo {
-		if fi.Mode()&os.ModeSymlink != 0 {
+	for _, entry := range dirInfo {
+		if entry.Type()&os.ModeSymlink != 0 {
 			continue
-		} else if fi.IsDir() {
-			i++
+		} else if entry.IsDir() {
 			dirs := make(chan DirTree, 1)
-			go osReadDir(filepath.Join(root, fi.Name()), dirs)
+			go osReadDir(filepath.Join(root, entry.Name()), dirs)
 			subDirChannels = append(subDirChannels, dirs)
 		} else {
-			f := FileInfo{fi.Name(), fi.Size(), fi.ModTime().Unix()}
+			info, err := entry.Info()
+			if err != nil {
+				continue
+			}
+			f := FileInfo{Name: entry.Name(), Size: info.Size(), ModifiedDate: info.ModTime().Unix()}
 			tree.Files = append(tree.Files, f)
-			tree.Size = tree.Size + fi.Size()
+			tree.Size += info.Size()
 		}
 	}
 
-	sem.Release(1)
-	//fmt.Println(root, " - ", i)
-
-	//fmt.Println(root, " - ", len(dirs))
 	for _, dirchan := range subDirChannels {
 		for elem := range dirchan {
 			tree.SubDirs = append(tree.SubDirs, elem)
-			tree.Size = tree.Size + elem.Size
+			tree.Size += elem.Size
 		}
-
 	}
 
-	fmt.Println(root, ", ", len(dirStructure))
 	dirStructure <- tree
-
 }
