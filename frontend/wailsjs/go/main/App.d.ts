@@ -6,6 +6,8 @@ export function ExportHTMLReport():Promise<string>;
 
 export function ExportHTMLTreeReport():Promise<string>;
 
+export function ExportTextTreeReport():Promise<string>;
+
 export function GetFolderView(arg1:string):Promise<main.FolderView>;
 
 export function GetRootFolderView():Promise<main.FolderView>;

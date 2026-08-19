@@ -540,6 +540,7 @@ window.onload = function() {
     const exportHtmlBtn = document.getElementById('export-html-btn');
 
     const exportTreeBtn = document.getElementById('export-tree-btn');
+    const exportTxtBtn = document.getElementById('export-txt-btn');
 
     if (exportBtn && exportDropdown) {
         exportBtn.addEventListener('click', (e) => {
@@ -580,6 +581,21 @@ window.onload = function() {
             } catch (err) {
                 console.error("Tree export error:", err);
                 showToast(`❌ Tree export failed: ${err}`, true);
+            }
+        });
+    }
+
+    if (exportTxtBtn) {
+        exportTxtBtn.addEventListener('click', async () => {
+            exportDropdown.classList.remove('open');
+            try {
+                const savedPath = await window.go.main.App.ExportTextTreeReport();
+                if (savedPath) {
+                    showToast(`📝 Text tree saved to: ${savedPath}`);
+                }
+            } catch (err) {
+                console.error("Text export error:", err);
+                showToast(`❌ Text export failed: ${err}`, true);
             }
         });
     }

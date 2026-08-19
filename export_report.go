@@ -656,6 +656,100 @@ func (a *App) ExportHTMLTreeReport() (string, error) {
 	return savePath, nil
 }
 
+// ExportTextTreeReport builds a plain-text ASCII tree report (.txt) and prompts user to save
+func (a *App) ExportTextTreeReport() (string, error) {
+	a.dbMutex.RLock()
+	defer a.dbMutex.RUnlock()
+
+	if a.db == nil || a.rootPath == "" {
+		return "", fmt.Errorf("no scan data available to export")
+	}
+
+	var rootSize int64
+	_ = a.db.QueryRow("SELECT size FROM entries WHERE path = ?", a.rootPath).Scan(&rootSize)
+	if rootSize <= 0 {
+		rootSize = 1
+	}
+
+	nodesByPath := make(map[string]*TreeNode)
+	childrenByParent := make(map[string][]*TreeNode)
+
+	rows, err := a.db.Query("SELECT path, parent_path, name, size, is_dir FROM entries")
+	if err != nil {
+		return "", fmt.Errorf("query failed: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var p, parent, name string
+		var sz int64
+		var isDirInt int
+		if err := rows.Scan(&p, &parent, &name, &sz, &isDirInt); err == nil {
+			node := &TreeNode{
+				Name:  name,
+				Path:  p,
+				Size:  sz,
+				IsDir: (isDirInt == 1),
+			}
+			nodesByPath[p] = node
+			childrenByParent[parent] = append(childrenByParent[parent], node)
+		}
+	}
+
+	for parent, children := range childrenByParent {
+		sort.Slice(children, func(i, j int) bool {
+			if children[i].IsDir != children[j].IsDir {
+				return children[i].IsDir
+			}
+			return children[i].Size > children[j].Size
+		})
+		childrenByParent[parent] = children
+	}
+
+	for p, node := range nodesByPath {
+		if ch, exists := childrenByParent[p]; exists {
+			node.Children = ch
+		}
+	}
+
+	rootNode, exists := nodesByPath[a.rootPath]
+	if !exists {
+		rootNode = &TreeNode{
+			Name:     filepath.Base(a.rootPath),
+			Path:     a.rootPath,
+			Size:     rootSize,
+			IsDir:    true,
+			Children: childrenByParent[a.rootPath],
+		}
+	}
+
+	var htmlTree strings.Builder
+	var plainTree strings.Builder
+	renderAsciiTree(rootNode, "", true, true, rootSize, &htmlTree, &plainTree)
+
+	defaultName := fmt.Sprintf("outaspace-tree-%s.txt", time.Now().Format("20060102-150405"))
+	savePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Save OutaSpace Text Tree Report",
+		DefaultFilename: defaultName,
+		Filters: []runtime.FileFilter{
+			{
+				DisplayName: "Text Files (*.txt)",
+				Pattern:     "*.txt",
+			},
+		},
+	})
+
+	if err != nil || savePath == "" {
+		return "", nil
+	}
+
+	if err := os.WriteFile(savePath, []byte(plainTree.String()), 0644); err != nil {
+		return "", fmt.Errorf("failed to save text report: %w", err)
+	}
+
+	return savePath, nil
+}
+
 func makeAsciiBar(pct float64) string {
 	filled := int((pct / 100.0) * 10.0 + 0.5)
 	if filled > 10 {

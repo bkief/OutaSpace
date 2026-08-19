@@ -10,6 +10,10 @@ export function ExportHTMLTreeReport() {
   return window['go']['main']['App']['ExportHTMLTreeReport']();
 }
 
+export function ExportTextTreeReport() {
+  return window['go']['main']['App']['ExportTextTreeReport']();
+}
+
 export function GetFolderView(arg1) {
   return window['go']['main']['App']['GetFolderView'](arg1);
 }
