@@ -10,6 +10,10 @@ export function ExportHTMLTreeReport() {
   return window['go']['main']['App']['ExportHTMLTreeReport']();
 }
 
+export function ExportRawDataCSV() {
+  return window['go']['main']['App']['ExportRawDataCSV']();
+}
+
 export function ExportTextTreeReport() {
   return window['go']['main']['App']['ExportTextTreeReport']();
 }

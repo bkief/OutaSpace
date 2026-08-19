@@ -541,6 +541,7 @@ window.onload = function() {
 
     const exportTreeBtn = document.getElementById('export-tree-btn');
     const exportTxtBtn = document.getElementById('export-txt-btn');
+    const exportCsvBtn = document.getElementById('export-csv-btn');
 
     if (exportBtn && exportDropdown) {
         exportBtn.addEventListener('click', (e) => {
@@ -596,6 +597,21 @@ window.onload = function() {
             } catch (err) {
                 console.error("Text export error:", err);
                 showToast(`❌ Text export failed: ${err}`, true);
+            }
+        });
+    }
+
+    if (exportCsvBtn) {
+        exportCsvBtn.addEventListener('click', async () => {
+            exportDropdown.classList.remove('open');
+            try {
+                const savedPath = await window.go.main.App.ExportRawDataCSV();
+                if (savedPath) {
+                    showToast(`📊 CSV data saved to: ${savedPath}`);
+                }
+            } catch (err) {
+                console.error("CSV export error:", err);
+                showToast(`❌ CSV export failed: ${err}`, true);
             }
         });
     }

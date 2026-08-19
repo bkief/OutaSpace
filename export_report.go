@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
 	"html"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -531,41 +533,36 @@ func formatNumber(n int) string {
 }
 
 type TreeNode struct {
-	Name     string
-	Path     string
-	Size     int64
-	IsDir    bool
-	Children []*TreeNode
+	Name        string
+	Path        string
+	Size        int64
+	IsDir       bool
+	ModTime     int64
+	DirectFiles int
+	DirectDirs  int
+	TotalFiles  int
+	TotalDirs   int
+	Children    []*TreeNode
 }
 
-// ExportHTMLTreeReport builds a hierarchical ASCII tree report with visual proportional bars and prompts user to save
-func (a *App) ExportHTMLTreeReport() (string, error) {
-	a.dbMutex.RLock()
-	defer a.dbMutex.RUnlock()
-
-	if a.db == nil || a.rootPath == "" {
-		return "", fmt.Errorf("no scan data available to export")
-	}
-
-	// 1. Get Root Size & Counts
+func (a *App) buildInMemoryTree() (*TreeNode, int64, int, int, error) {
 	var rootSize int64
 	_ = a.db.QueryRow("SELECT size FROM entries WHERE path = ?", a.rootPath).Scan(&rootSize)
 	if rootSize <= 0 {
 		rootSize = 1
 	}
 
-	var fileCount int
-	var dirCount int
-	_ = a.db.QueryRow("SELECT COUNT(*) FROM entries WHERE is_dir = 0").Scan(&fileCount)
-	_ = a.db.QueryRow("SELECT COUNT(*) FROM entries WHERE is_dir = 1").Scan(&dirCount)
+	var totalFileCount int
+	var totalDirCount int
+	_ = a.db.QueryRow("SELECT COUNT(*) FROM entries WHERE is_dir = 0").Scan(&totalFileCount)
+	_ = a.db.QueryRow("SELECT COUNT(*) FROM entries WHERE is_dir = 1").Scan(&totalDirCount)
 
-	// 2. Load all entries into memory tree
 	nodesByPath := make(map[string]*TreeNode)
 	childrenByParent := make(map[string][]*TreeNode)
 
-	rows, err := a.db.Query("SELECT path, parent_path, name, size, is_dir FROM entries")
+	rows, err := a.db.Query("SELECT path, parent_path, name, size, is_dir, mod_time FROM entries")
 	if err != nil {
-		return "", fmt.Errorf("query failed: %w", err)
+		return nil, 0, 0, 0, fmt.Errorf("query failed: %w", err)
 	}
 	defer rows.Close()
 
@@ -573,33 +570,40 @@ func (a *App) ExportHTMLTreeReport() (string, error) {
 		var p, parent, name string
 		var sz int64
 		var isDirInt int
-		if err := rows.Scan(&p, &parent, &name, &sz, &isDirInt); err == nil {
+		var modTime int64
+		if err := rows.Scan(&p, &parent, &name, &sz, &isDirInt, &modTime); err == nil {
 			node := &TreeNode{
-				Name:  name,
-				Path:  p,
-				Size:  sz,
-				IsDir: (isDirInt == 1),
+				Name:    name,
+				Path:    p,
+				Size:    sz,
+				IsDir:   (isDirInt == 1),
+				ModTime: modTime,
 			}
 			nodesByPath[p] = node
 			childrenByParent[parent] = append(childrenByParent[parent], node)
 		}
 	}
 
-	// Sort children for every parent: directories first, then size descending
 	for parent, children := range childrenByParent {
 		sort.Slice(children, func(i, j int) bool {
 			if children[i].IsDir != children[j].IsDir {
-				return children[i].IsDir // Dirs first
+				return children[i].IsDir
 			}
 			return children[i].Size > children[j].Size
 		})
 		childrenByParent[parent] = children
 	}
 
-	// Wire up Children slices
 	for p, node := range nodesByPath {
 		if ch, exists := childrenByParent[p]; exists {
 			node.Children = ch
+			for _, c := range ch {
+				if c.IsDir {
+					node.DirectDirs++
+				} else {
+					node.DirectFiles++
+				}
+			}
 		}
 	}
 
@@ -614,7 +618,47 @@ func (a *App) ExportHTMLTreeReport() (string, error) {
 		}
 	}
 
-	// 3. Render ASCII Tree (HTML and Plain text)
+	// Compute recursive counts for each node
+	var computeRecursiveCounts func(n *TreeNode) (int, int)
+	computeRecursiveCounts = func(n *TreeNode) (int, int) {
+		if !n.IsDir {
+			n.TotalFiles = 1
+			n.TotalDirs = 0
+			return 1, 0
+		}
+		tf := 0
+		td := 0
+		for _, child := range n.Children {
+			f, d := computeRecursiveCounts(child)
+			tf += f
+			if child.IsDir {
+				td += (d + 1)
+			}
+		}
+		n.TotalFiles = tf
+		n.TotalDirs = td
+		return tf, td
+	}
+	computeRecursiveCounts(rootNode)
+
+	return rootNode, rootSize, totalFileCount, totalDirCount, nil
+}
+
+// ExportHTMLTreeReport builds a hierarchical ASCII tree report with visual proportional bars and prompts user to save
+func (a *App) ExportHTMLTreeReport() (string, error) {
+	a.dbMutex.RLock()
+	defer a.dbMutex.RUnlock()
+
+	if a.db == nil || a.rootPath == "" {
+		return "", fmt.Errorf("no scan data available to export")
+	}
+
+	rootNode, rootSize, fileCount, dirCount, err := a.buildInMemoryTree()
+	if err != nil {
+		return "", err
+	}
+
+	// Render ASCII Tree (HTML and Plain text)
 	var htmlTree strings.Builder
 	var plainTree strings.Builder
 	renderAsciiTree(rootNode, "", true, true, rootSize, &htmlTree, &plainTree)
@@ -629,10 +673,8 @@ func (a *App) ExportHTMLTreeReport() (string, error) {
 		}
 	}
 
-	// 4. Wrap in Full HTML Document
 	fullHTML := generateTreeHTMLDocument(a.rootPath, scanDate, durationStr, rootSize, fileCount, dirCount, htmlTree.String(), plainTree.String())
 
-	// 5. Prompt Save File Dialog
 	defaultName := fmt.Sprintf("outaspace-tree-%s.html", time.Now().Format("20060102-150405"))
 	savePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Save OutaSpace HTML Tree Report",
@@ -665,62 +707,9 @@ func (a *App) ExportTextTreeReport() (string, error) {
 		return "", fmt.Errorf("no scan data available to export")
 	}
 
-	var rootSize int64
-	_ = a.db.QueryRow("SELECT size FROM entries WHERE path = ?", a.rootPath).Scan(&rootSize)
-	if rootSize <= 0 {
-		rootSize = 1
-	}
-
-	nodesByPath := make(map[string]*TreeNode)
-	childrenByParent := make(map[string][]*TreeNode)
-
-	rows, err := a.db.Query("SELECT path, parent_path, name, size, is_dir FROM entries")
+	rootNode, rootSize, _, _, err := a.buildInMemoryTree()
 	if err != nil {
-		return "", fmt.Errorf("query failed: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var p, parent, name string
-		var sz int64
-		var isDirInt int
-		if err := rows.Scan(&p, &parent, &name, &sz, &isDirInt); err == nil {
-			node := &TreeNode{
-				Name:  name,
-				Path:  p,
-				Size:  sz,
-				IsDir: (isDirInt == 1),
-			}
-			nodesByPath[p] = node
-			childrenByParent[parent] = append(childrenByParent[parent], node)
-		}
-	}
-
-	for parent, children := range childrenByParent {
-		sort.Slice(children, func(i, j int) bool {
-			if children[i].IsDir != children[j].IsDir {
-				return children[i].IsDir
-			}
-			return children[i].Size > children[j].Size
-		})
-		childrenByParent[parent] = children
-	}
-
-	for p, node := range nodesByPath {
-		if ch, exists := childrenByParent[p]; exists {
-			node.Children = ch
-		}
-	}
-
-	rootNode, exists := nodesByPath[a.rootPath]
-	if !exists {
-		rootNode = &TreeNode{
-			Name:     filepath.Base(a.rootPath),
-			Path:     a.rootPath,
-			Size:     rootSize,
-			IsDir:    true,
-			Children: childrenByParent[a.rootPath],
-		}
+		return "", err
 	}
 
 	var htmlTree strings.Builder
@@ -745,6 +734,112 @@ func (a *App) ExportTextTreeReport() (string, error) {
 
 	if err := os.WriteFile(savePath, []byte(plainTree.String()), 0644); err != nil {
 		return "", fmt.Errorf("failed to save text report: %w", err)
+	}
+
+	return savePath, nil
+}
+
+// ExportRawDataCSV exports all scanned file and directory stats into a structured CSV file
+func (a *App) ExportRawDataCSV() (string, error) {
+	a.dbMutex.RLock()
+	defer a.dbMutex.RUnlock()
+
+	if a.db == nil || a.rootPath == "" {
+		return "", fmt.Errorf("no scan data available to export")
+	}
+
+	rootNode, rootSize, _, _, err := a.buildInMemoryTree()
+	if err != nil {
+		return "", err
+	}
+
+	defaultName := fmt.Sprintf("outaspace-raw-data-%s.csv", time.Now().Format("20060102-150405"))
+	savePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Save OutaSpace Raw Data CSV",
+		DefaultFilename: defaultName,
+		Filters: []runtime.FileFilter{
+			{
+				DisplayName: "CSV Files (*.csv)",
+				Pattern:     "*.csv",
+			},
+		},
+	})
+
+	if err != nil || savePath == "" {
+		return "", nil // User cancelled
+	}
+
+	file, err := os.Create(savePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to create CSV file: %w", err)
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	// Header row
+	header := []string{
+		"path",
+		"type",
+		"size_bytes",
+		"size_human",
+		"files_count",
+		"dirs_count",
+		"pct_total",
+		"last_modified",
+	}
+	if err := writer.Write(header); err != nil {
+		return "", err
+	}
+
+	// Write rows recursively in depth-first order
+	var writeNode func(n *TreeNode) error
+	writeNode = func(n *TreeNode) error {
+		typeStr := "file"
+		filesCount := 1
+		dirsCount := 0
+		if n.IsDir {
+			typeStr = "dir"
+			filesCount = n.TotalFiles
+			dirsCount = n.TotalDirs
+		}
+
+		pct := (float64(n.Size) / float64(rootSize)) * 100.0
+		if pct > 100.0 {
+			pct = 100.0
+		}
+
+		modTimeStr := ""
+		if n.ModTime > 0 {
+			modTimeStr = time.Unix(n.ModTime, 0).UTC().Format(time.RFC3339)
+		}
+
+		row := []string{
+			n.Path,
+			typeStr,
+			strconv.FormatInt(n.Size, 10),
+			formatBytes(n.Size),
+			strconv.Itoa(filesCount),
+			strconv.Itoa(dirsCount),
+			fmt.Sprintf("%.2f", pct),
+			modTimeStr,
+		}
+
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+
+		for _, child := range n.Children {
+			if err := writeNode(child); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	if err := writeNode(rootNode); err != nil {
+		return "", fmt.Errorf("failed writing csv rows: %w", err)
 	}
 
 	return savePath, nil

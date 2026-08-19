@@ -20,6 +20,7 @@ type DBEntry struct {
 	Name       string
 	Size       int64
 	IsDir      bool
+	ModTime    int64
 }
 
 type ItemInfo struct {
@@ -104,7 +105,8 @@ func (a *App) wipeTables() error {
 		parent_path TEXT,
 		name TEXT,
 		size INTEGER DEFAULT 0,
-		is_dir INTEGER DEFAULT 0
+		is_dir INTEGER DEFAULT 0,
+		mod_time INTEGER DEFAULT 0
 	);
 	CREATE INDEX IF NOT EXISTS idx_parent ON entries(parent_path);
 	`
@@ -278,8 +280,8 @@ func (a *App) scanDirectory(root string, speed string) {
 				tx, err := a.db.Begin()
 				if err == nil {
 					stmt, err := tx.Prepare(`
-						INSERT OR REPLACE INTO entries (path, parent_path, name, size, is_dir) 
-						VALUES (?, ?, ?, ?, ?)
+						INSERT OR REPLACE INTO entries (path, parent_path, name, size, is_dir, mod_time) 
+						VALUES (?, ?, ?, ?, ?, ?)
 					`)
 					if err == nil {
 						for _, e := range batch {
@@ -287,7 +289,7 @@ func (a *App) scanDirectory(root string, speed string) {
 							if e.IsDir {
 								isDir = 1
 							}
-							_, _ = stmt.Exec(e.Path, e.ParentPath, e.Name, e.Size, isDir)
+							_, _ = stmt.Exec(e.Path, e.ParentPath, e.Name, e.Size, isDir, e.ModTime)
 						}
 						_ = stmt.Close()
 					}
@@ -347,6 +349,7 @@ func (a *App) scanDirectory(root string, speed string) {
 				info, err := entry.Info()
 				if err == nil {
 					size := info.Size()
+					modTime := info.ModTime().Unix()
 					directFilesSize += size
 
 					// Stream to SQLite batch channel
@@ -357,6 +360,7 @@ func (a *App) scanDirectory(root string, speed string) {
 						Name:       entry.Name(),
 						Size:       size,
 						IsDir:      false,
+						ModTime:    modTime,
 					}
 
 					// Non-blocking send to fileChan (poor man's backpressure rate-limiter)
@@ -376,6 +380,11 @@ func (a *App) scanDirectory(root string, speed string) {
 
 		totalDirSize := directFilesSize + subDirsTotalSize
 
+		var dirModTime int64
+		if dirStat, err := os.Stat(path); err == nil {
+			dirModTime = dirStat.ModTime().Unix()
+		}
+
 		// Record total recursive size for directory in SQLite
 		parentPath := filepath.Dir(path)
 		dbChan <- DBEntry{
@@ -384,6 +393,7 @@ func (a *App) scanDirectory(root string, speed string) {
 			Name:       filepath.Base(path),
 			Size:       totalDirSize,
 			IsDir:      true,
+			ModTime:    dirModTime,
 		}
 
 		return totalDirSize
