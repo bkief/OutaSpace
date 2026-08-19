@@ -1,0 +1,55 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: outaspace
+
+builds:
+  - id: outaspace-linux
+    binary: OutaSpace
+    builder: prebuilt
+    goos:
+      - linux
+    goarch:
+      - amd64
+    prebuilt:
+      path: build/bin/OutaSpace
+
+nfpms:
+  - id: outaspace-pkgs
+    package_name: outaspace
+    file_name_template: "{{ .PackageName }}_{{ .Version }}_{{ .Arch }}"
+    vendor: "Brian Kiefer"
+    homepage: "https://github.com/bkief/OutaSpace"
+    maintainer: "Brian Kiefer <---@---.com>"
+    description: "Visual Disk Space Analyzer with Real-Time Rain and Interactive Treemaps"
+    license: "GPL-3.0"
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    dependencies:
+      - libgtk-3-0
+      - libwebkit2gtk-4.0-37 | libwebkit2gtk-4.1-0
+    contents:
+      - src: build/appicon.png
+        dst: /usr/share/icons/hicolor/256x256/apps/outaspace.png
+      - src: build/linux/outaspace.desktop
+        dst: /usr/share/applications/outaspace.desktop
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+release:
+  github:
+    owner: bkief
+    name: OutaSpace
+  extra_files:
+    - glob: "./extra-files/*"

@@ -4,6 +4,11 @@ build/bin
 build/windows/installer/wails_tools.nsh
 build/windows/installer/tmp/
 
+# MSIX staging and build dist
+build/windows/msix/staging/
+dist/
+extra-files/
+
 # IDEs
 .idea
 .vscode

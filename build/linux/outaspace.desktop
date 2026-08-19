@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=OutaSpace
+Comment=Visual Disk Space Analyzer with Real-Time Rain and Interactive Treemaps
+Exec=OutaSpace
+Icon=outaspace
+Terminal=false
+Type=Application
+Categories=Utility;System;
+StartupWMClass=OutaSpace

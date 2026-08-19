@@ -33,7 +33,7 @@ permissions:
 
 jobs:
   build-windows:
-    name: Build Windows Artifacts
+    name: Build Windows Artifacts (EXE & MSIX)
     runs-on: windows-latest
     steps:
       - name: Checkout Code
@@ -55,35 +55,12 @@ jobs:
         run: |
           wails build -platform windows/amd64
 
-      - name: Build Windows Per-User MSI
-        shell: pwsh
-        run: |
-          # Locate WiX Toolset v3 on runner
-          $wixDir = Get-ChildItem -Path "C:\Program Files (x86)\WiX Toolset*" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -First 1
-          if ($wixDir -and (Test-Path "$wixDir\bin")) {
-            $env:PATH = "$wixDir\bin;" + $env:PATH
-          }
-
-          # Parse product version from tag name (strip leading 'v')
-          $rawTag = "${{ inputs.tag_name }}"
-          $cleanVersion = ($rawTag -replace '^v','').Trim()
-          $parts = $cleanVersion.Split('.')
-          while ($parts.Count -lt 3) { $parts += "0" }
-          $wixVersion = ($parts[0..2] -join '.')
-          if ($parts.Count -ge 4) {
-            $wixVersion = ($parts[0..3] -join '.')
-          }
-          Write-Host "Using WiX Product Version: $wixVersion"
-
-          candle.exe -arch x64 "-dProductVersion=$wixVersion" build/windows/installer/outaspace-user.wxs -out build/bin/outaspace.wixobj
-          light.exe -sval build/bin/outaspace.wixobj -out build/bin/OutaSpace-windows-amd64.msi
-
-      - name: Prepare Windows Release Artifacts
+      - name: Build Windows MSIX Package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist
           Copy-Item "build\bin\OutaSpace.exe" -Destination "dist\OutaSpace-windows-amd64.exe"
-          Copy-Item "build\bin\OutaSpace-windows-amd64.msi" -Destination "dist\OutaSpace-windows-amd64.msi"
+          powershell -ExecutionPolicy Bypass -File build\windows\msix\generate-msix.ps1 -Version "${{ inputs.tag_name }}" -OutputDir "dist"
 
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
@@ -92,80 +69,8 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
-  build-linux:
-    name: Build Linux AppImage
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Install System Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.0-dev file || sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev file
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "go.mod"
-          check-latest: true
-
-      - name: Install Wails CLI
-        run: |
-          go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
-      - name: Build Linux Binary
-        run: |
-          if pkg-config --exists webkit2gtk-4.0; then
-          wails build -platform linux/amd64
-          else
-            wails build -platform linux/amd64 -tags webkit2_41
-          fi
-
-      - name: Package AppImage
-        run: |
-          mkdir -p dist
-          mkdir -p AppDir/usr/bin
-          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-
-          cp build/bin/OutaSpace AppDir/usr/bin/OutaSpace
-          chmod +x AppDir/usr/bin/OutaSpace
-          cp build/appicon.png AppDir/usr/share/icons/hicolor/256x256/apps/outaspace.png
-          cp build/appicon.png AppDir/outaspace.png
-
-          cat << 'EOF' > AppDir/OutaSpace.desktop
-          [Desktop Entry]
-          Name=OutaSpace
-          Comment=Visual Disk Space Analyzer
-          Exec=OutaSpace
-          Icon=outaspace
-          Type=Application
-          Categories=Utility;System;
-          Terminal=false
-          EOF
-
-          cat << 'EOF' > AppDir/AppRun
-          #!/bin/sh
-          SELF=$(readlink -f "$0")
-          HERE=${SELF%/*}
-          export PATH="${HERE}/usr/bin:${PATH}"
-          exec "${HERE}/usr/bin/OutaSpace" "$@"
-          EOF
-          chmod +x AppDir/AppRun
-
-          curl -sLO https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool-x86_64.AppImage
-          ARCH=x86_64 ./appimagetool-x86_64.AppImage --appimage-extract-and-run AppDir dist/OutaSpace-linux-amd64.AppImage
-
-      - name: Upload Linux Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-artifacts
-          path: dist/*
-          if-no-files-found: error
-
   build-macos:
-    name: Build macOS DMG
+    name: Build macOS Artifact (DMG)
     runs-on: macos-latest
     steps:
       - name: Checkout Code
@@ -212,35 +117,63 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
-  publish-release:
-    name: Publish GitHub Release
-    runs-on: ubuntu-latest
-    needs: [build-windows, build-linux, build-macos]
+  release:
+    name: Release & Package (GoReleaser, DEB, RPM)
+    runs-on: ubuntu-22.04
+    needs: [build-windows, build-macos]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Download All Artifacts
+      - name: Install Linux System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.0-dev file || sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev file
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          check-latest: true
+
+      - name: Install Wails CLI
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build Linux Binary with Wails
+        run: |
+          if pkg-config --exists webkit2gtk-4.0; then
+            wails build -platform linux/amd64
+          else
+            wails build -platform linux/amd64 -tags webkit2_41
+          fi
+
+      - name: Download Windows Artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          name: windows-artifacts
+          path: extra-files
 
-      - name: Flatten and Checksum Artifacts
-        run: |
-          mkdir -p release-files
-          find artifacts -type f -exec cp {} release-files/ \;
-          cd release-files
-          sha256sum * > SHA256SUMS.txt
-          ls -la
-
-      - name: Publish Release
-        uses: softprops/action-gh-release@v2
+      - name: Download macOS Artifacts
+        uses: actions/download-artifact@v4
         with:
-          tag_name: ${{ inputs.tag_name }}
-          name: ${{ inputs.release_name != '' && inputs.release_name || inputs.tag_name }}
-          body: ${{ inputs.release_notes }}
-          draft: ${{ inputs.draft }}
-          prerelease: ${{ inputs.prerelease }}
-          files: release-files/*
+          name: macos-artifacts
+          path: extra-files
+
+      - name: Set Release Tag
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ inputs.tag_name }}" -m "Release ${{ inputs.tag_name }}" || true
+
+      - name: Run GoReleaser (Package DEB, RPM, & Publish Release)
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ inputs.tag_name }}
