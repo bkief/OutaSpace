@@ -1,0 +1,10 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "gui",
+  "outputfilename": "gui",
+  "wailsjsdir": "./frontend",
+  "author": {
+    "name": "Brian Kiefer",
+    "email": "briankiefer@outlook.com"
+  }
+}
