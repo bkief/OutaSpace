@@ -5,15 +5,18 @@ project_name: outaspace
 
 builds:
   - id: outaspace-linux
+    main: .
     binary: OutaSpace
-    builder: custom
-    custom:
-      commands:
-        - cp build/bin/OutaSpace {{ .Path }}
     goos:
       - linux
     goarch:
       - amd64
+    env:
+      - CGO_ENABLED=1
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
 
 nfpms:
   - id: outaspace-pkgs
