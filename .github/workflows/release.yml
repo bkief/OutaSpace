@@ -145,18 +145,6 @@ jobs:
           go-version-file: "go.mod"
           check-latest: true
 
-      - name: Install Wails CLI
-        run: |
-          go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
-      - name: Build Linux Binary with Wails
-        run: |
-          if pkg-config --exists webkit2gtk-4.0; then
-            wails build -platform linux/amd64
-          else
-            wails build -platform linux/amd64 -tags webkit2_41
-          fi
-
       - name: Download Windows Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -169,10 +157,11 @@ jobs:
           name: macos-artifacts
           path: extra-files
 
-      - name: Set Release Tag
+      - name: Prepare Git State for GoReleaser
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git reset --hard
           git tag -a "${{ inputs.tag_name }}" -m "Release ${{ inputs.tag_name }}" || true
 
       - name: Run GoReleaser (Package DEB, RPM, & Publish Release)
