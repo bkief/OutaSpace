@@ -24,7 +24,7 @@ nfpms:
     file_name_template: "{{ .PackageName }}_{{ .Version }}_{{ .Arch }}"
     vendor: "Brian Kiefer"
     homepage: "https://github.com/bkief/OutaSpace"
-    maintainer: "Brian Kiefer <---@---.com>"
+    maintainer: "Brian Kiefer <contact@plumbago.dev>"
     description: "Visual Disk Space Analyzer with Real-Time Rain and Interactive Treemaps"
     license: "GPL-3.0"
     formats:
